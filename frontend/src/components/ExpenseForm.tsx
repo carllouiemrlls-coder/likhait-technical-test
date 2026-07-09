@@ -1,10 +1,5 @@
-/**
- * Form component for adding/editing expenses
- */
-
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { ExpenseFormData } from "../types";
-import { EXPENSE_CATEGORIES } from "../constants/categories";
 import { TextField, SelectBox, Button } from "../vibes";
 import { useExpenseForm } from "../hooks/useExpenseForm";
 
@@ -27,6 +22,23 @@ export function ExpenseForm({
       onSubmit,
     });
 
+  const [categories, setCategories] = useState<string[]>([]);
+  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+  useEffect(() => {
+    // fetch dynamic categories from backend
+    fetch("/api/categories")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setCategories(data.map((c: any) => (c.name ? c.name : String(c))));
+        }
+      })
+      .catch(() => {
+        // fallback silently
+      });
+  }, []);
+
   const formStyle: React.CSSProperties = {
     display: "flex",
     flexDirection: "column",
@@ -39,13 +51,22 @@ export function ExpenseForm({
     marginTop: "0.5rem",
   };
 
-  const categoryOptions = EXPENSE_CATEGORIES.map((category) => ({
-    value: category,
-    label: category,
-  }));
+  const categoryOptions = categories.length
+    ? categories.map((category) => ({ value: category, label: category }))
+    : [];
+
+  // Intercept submit to enforce client-side future-date validation
+  const onFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (formData.date && new Date(formData.date) > new Date()) {
+      alert("Expense date cannot be in the future.");
+      return;
+    }
+    await handleSubmit(e);
+  };
 
   return (
-    <form onSubmit={handleSubmit} style={formStyle}>
+    <form onSubmit={onFormSubmit} style={formStyle}>
       <TextField
         label="Amount"
         type="number"
@@ -87,6 +108,7 @@ export function ExpenseForm({
         error={errors.date}
         fullWidth
         required
+        max={today} // prevent selecting future dates in the browser
       />
 
       <div style={buttonGroupStyle}>
