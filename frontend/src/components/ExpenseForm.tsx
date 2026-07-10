@@ -2,11 +2,11 @@
  * Form component for adding/editing expenses
  */
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { ExpenseFormData } from "../types";
-import { EXPENSE_CATEGORIES } from "../constants/categories";
 import { TextField, SelectBox, Button } from "../vibes";
 import { useExpenseForm } from "../hooks/useExpenseForm";
+import { createCategory, fetchCategories } from "../services/api";
 
 interface ExpenseFormProps {
   initialData?: Partial<ExpenseFormData>;
@@ -21,6 +21,10 @@ export function ExpenseForm({
   onCancel,
   submitLabel = "Add Expense",
 }: ExpenseFormProps) {
+  const [categoryOptions, setCategoryOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [categoryError, setCategoryError] = useState("");
   const { formData, errors, isSubmitting, handleChange, handleSubmit } =
     useExpenseForm({
       initialData,
@@ -39,10 +43,46 @@ export function ExpenseForm({
     marginTop: "0.5rem",
   };
 
-  const categoryOptions = EXPENSE_CATEGORIES.map((category) => ({
-    value: category,
-    label: category,
-  }));
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const categories = await fetchCategories();
+        setCategoryOptions(
+          categories.map((category) => ({
+            value: category.name,
+            label: category.name,
+          })),
+        );
+      } catch (error) {
+        console.error("Failed to load categories", error);
+      }
+    };
+
+    loadCategories();
+  }, []);
+
+  const handleCreateCategory = async () => {
+    const trimmedName = newCategoryName.trim();
+    if (!trimmedName) {
+      setCategoryError("Category name is required");
+      return;
+    }
+
+    try {
+      setIsCreatingCategory(true);
+      const category = await createCategory(trimmedName);
+      const nextOption = { value: category.name, label: category.name };
+      setCategoryOptions((prev) => [...prev, nextOption]);
+      handleChange("category", category.name);
+      setNewCategoryName("");
+      setCategoryError("");
+    } catch (error) {
+      console.error("Failed to create category", error);
+      setCategoryError("Unable to create category");
+    } finally {
+      setIsCreatingCategory(false);
+    }
+  };
 
   return (
     <form onSubmit={handleSubmit} style={formStyle}>
@@ -79,6 +119,33 @@ export function ExpenseForm({
         required
       />
 
+      <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }}>
+        <TextField
+          label="Add Category"
+          type="text"
+          placeholder="New category"
+          value={newCategoryName}
+          onChange={(e) => {
+            setNewCategoryName(e.target.value);
+            if (categoryError) {
+              setCategoryError("");
+            }
+          }}
+          fullWidth
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={handleCreateCategory}
+          disabled={isCreatingCategory}
+        >
+          {isCreatingCategory ? "Adding..." : "Add"}
+        </Button>
+      </div>
+      {categoryError && (
+        <div style={{ color: "#dc2626", fontSize: "0.875rem" }}>{categoryError}</div>
+      )}
+
       <TextField
         label="Date"
         type="date"
@@ -87,6 +154,7 @@ export function ExpenseForm({
         error={errors.date}
         fullWidth
         required
+        max={new Date().toISOString().split("T")[0]}
       />
 
       <div style={buttonGroupStyle}>

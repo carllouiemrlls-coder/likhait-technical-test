@@ -6,6 +6,16 @@ import { useState } from "react";
 import { ExpenseFormData } from "../types";
 import { formatDate } from "../utils/expenseUtils";
 
+function isValidDate(value: string): boolean {
+  if (!value) return false;
+
+  const inputDate = new Date(`${value}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return !Number.isNaN(inputDate.getTime()) && inputDate <= today;
+}
+
 interface UseExpenseFormProps {
   initialData?: Partial<ExpenseFormData>;
   onSubmit: (data: ExpenseFormData) => Promise<void>;
@@ -47,6 +57,8 @@ export function useExpenseForm({ initialData, onSubmit }: UseExpenseFormProps) {
 
     if (!formData.date) {
       newErrors.date = "Date is required";
+    } else if (!isValidDate(formData.date)) {
+      newErrors.date = "Date cannot be in the future";
     }
 
     setErrors(newErrors);
